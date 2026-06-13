@@ -3,32 +3,34 @@ from playwright.async_api import async_playwright
 
 LIST = "https://www.pokemon-card.com/card-search/index.php?keyword=&se_ta=&regulation_sidebar_form=XY&pg={p}"
 
-async def get_links(page):
-    links, seen, p, empty = [], set(), 1, 0
+async def get_cards_from_list(page):
+    cards = {}
+    p, empty = 1, 0
     while p <= 60:
         print(f"list {p}")
         try:
-            await page.goto(LIST.format(p=p), timeout=40000)
+            await page.goto(LIST.format(p=p), wait_until="networkidle", timeout=40000)
         except Exception:
             break
-        try:
-            await page.wait_for_selector("a[href*='details.php/card/']", timeout=15000)
-        except Exception:
-            pass
+        await asyncio.sleep(2)
         found = 0
-        for a in await page.query_selector_all("a[href*='details.php/card/']"):
-            href = await a.get_attribute("href")
-            if not href:
+        for img in await page.query_selector_all("img"):
+            src = await img.get_attribute("src")
+            alt = await img.get_attribute("alt")
+            if not src or "card_images" not in src:
                 continue
-            m = re.search(r"/card/(\d+)", href)
-            if not m or m.group(1) in seen:
+            if not alt or not alt.strip():
                 continue
-            seen.add(m.group(1))
-            if href.startswith("/"):
-                href = "https://www.pokemon-card.com" + href
-            links.append({"id": m.group(1), "url": href})
+            m = re.search(r"/(\d+)_([PTE])_", src)
+            if not m:
+                continue
+            cid, code = m.group(1), m.group(2)
+            if cid in cards:
+                continue
+            cards[cid] = {"id": cid, "name": alt.strip(), "code": code,
+                          "image": src if src.startswith("http") else "https://www.pokemon-card.com" + src}
             found += 1
-        print(f"  {found} total {len(links)}")
+        print(f"  {found} total {len(cards)}")
         if found == 0:
             empty += 1
             if empty >= 2:
@@ -37,47 +39,42 @@ async def get_links(page):
             empty = 0
         p += 1
         await asyncio.sleep(1)
-    return links
+    return list(cards.values())
 
-async def get_detail(page, link):
+async def add_detail(page, card):
+    url = f"https://www.pokemon-card.com/card-search/details.php/card/{card['id']}"
     try:
-        await page.goto(link["url"], timeout=40000)
-        await page.wait_for_selector("h1", timeout=15000)
+        await page.goto(url, wait_until="domcontentloaded", timeout=40000)
+        await page.wait_for_selector("h1", timeout=10000)
     except Exception:
-        return None
-    h1 = await page.query_selector("h1")
-    name = (await h1.inner_text()).strip() if h1 else None
-    if not name:
-        return None
+        return
     body = await page.inner_text("body")
-    stage = "2進化" if "2 進化" in body else "1進化" if "1 進化" in body else "たね" if "たね" in body else "-"
-    m = re.search(r"HP\s*(\d+)", body)
-    hp = m.group(1) if m else None
-    ctype = "ポケモン"
-    if stage == "-":
-        ctype = "サポート" if "サポート" in body else "スタジアム" if "スタジアム" in body else "グッズ" if ("どうぐ" in body or "グッズ" in body) else "エネルギー" if "エネルギー" in body else "トレーナーズ"
-    img = await page.query_selector("img[src*='card_images']")
-    image = None
-    if img:
-        src = await img.get_attribute("src")
-        image = ("https://www.pokemon-card.com" + src) if src and src.startswith("/") else src
-    return {"id": link["id"], "name": name, "type": ctype, "stage": stage, "hp": hp,
-            "is_ex": "ex" in name.lower(), "is_mega": ("メガ" in name or name.startswith("M")), "image": image}
+    if card["code"] == "P":
+        card["type"] = "ポケモン"
+        card["stage"] = "2進化" if "2 進化" in body else "1進化" if "1 進化" in body else "たね"
+        m = re.search(r"HP\s*(\d+)", body)
+        card["hp"] = m.group(1) if m else None
+    elif card["code"] == "E":
+        card["type"] = "エネルギー"
+        card["stage"] = "-"
+    else:
+        card["type"] = "サポート" if "サポート" in body else "スタジアム" if "スタジアム" in body else "グッズ"
+        card["stage"] = "-"
+    name = card["name"]
+    card["is_ex"] = "ex" in name.lower()
+    card["is_mega"] = ("メガ" in name or name.startswith("M"))
 
 async def main():
     async with async_playwright() as pw:
         b = await pw.chromium.launch()
         page = await b.new_page()
-        links = await get_links(page)
-        print(f"{len(links)} links")
-        cards = []
-        for i, link in enumerate(links, 1):
-            c = await get_detail(page, link)
-            if c:
-                cards.append(c)
+        cards = await get_cards_from_list(page)
+        print(f"{len(cards)} cards found. getting details")
+        for i, c in enumerate(cards, 1):
+            await add_detail(page, c)
             if i % 20 == 0:
-                print(f"{i}/{len(links)}")
-            await asyncio.sleep(0.4)
+                print(f"{i}/{len(cards)}")
+            await asyncio.sleep(0.3)
         await b.close()
     with open("data/cards.json", "w", encoding="utf-8") as f:
         json.dump(cards, f, ensure_ascii=False, indent=2)
