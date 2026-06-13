@@ -38,28 +38,29 @@ async def main():
         await page.goto(START, wait_until="networkidle", timeout=90000)
         await page.wait_for_selector("img[src*='card_images']", timeout=30000)
         await asyncio.sleep(3)
-        page_no = 1
-        while page_no <= 140:
+        try:
+            max_page = await page.evaluate("window.vueApp ? window.vueApp.maxPage : 0")
+        except Exception:
+            max_page = 0
+        print(f"maxPage = {max_page}")
+        if not max_page or max_page < 1:
+            max_page = 140
+        for pno in range(1, int(max_page) + 1):
+            if pno > 1:
+                try:
+                    await page.evaluate(f"PTC.paginationRequest({pno})")
+                except Exception as e:
+                    print(f"page {pno} fail: {e}")
+                await asyncio.sleep(2.5)
+                try:
+                    await page.wait_for_selector("img[src*='card_images']", timeout=15000)
+                except Exception:
+                    pass
             got = await extract(page)
             new = sum(1 for c in got if c["id"] not in cards)
             for c in got:
                 cards[c["id"]] = c
-            print(f"page {page_no}: +{new} total {len(cards)}")
-            nextlink = await page.query_selector("a.next, a:has-text('次のページ')")
-            if not nextlink:
-                print("no next. end")
-                break
-            try:
-                await nextlink.click()
-            except Exception:
-                print("click fail. end")
-                break
-            await asyncio.sleep(3)
-            try:
-                await page.wait_for_selector("img[src*='card_images']", timeout=20000)
-            except Exception:
-                pass
-            page_no += 1
+            print(f"page {pno}/{int(max_page)}: +{new} total {len(cards)}")
         await b.close()
     result = list(cards.values())
     with open("data/cards.json", "w", encoding="utf-8") as f:
