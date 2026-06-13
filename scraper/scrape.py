@@ -72,9 +72,12 @@ async def fill_pokemon_detail(page, card):
         nm = (await a.inner_text()).strip() if a else ""
         line.append((nm, "ev_on" in cls))
     on_idx = next((i for i, (nm, on) in enumerate(line) if on), -1)
+    cand = None
     if on_idx >= 0 and on_idx + 1 < len(line):
         cand = line[on_idx + 1][0]
-        card["evolvesFrom"] = valid_evolves_from(card["name"], cand)
+    elif on_idx < 0 and line:
+        cand = line[0][0]
+    card["evolvesFrom"] = valid_evolves_from(card["name"], cand)
 
 async def main():
     cards = {}
