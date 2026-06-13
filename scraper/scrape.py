@@ -1,84 +1,71 @@
-
 """
-ポケモンカード スクレイピングスクリプト
-================================================
-このプログラムは、ポケモンカード公式サイトから
-HIJスタンダードのカード情報を自動で集めて、
-cards.json というファイルに保存します。
-
-GitHub Actions（クラウド）の上で自動実行されるので、
-あなたのPCやiPhoneで動かす必要はありません。
+ポケモンカード スクレイピングスクリプト（改良版）
+HIJスタンダードのカードを公式サイトから集めて
+data/cards.json に保存します。
 """
 
 import json
 import asyncio
 from playwright.async_api import async_playwright
 
-# 検索のベースURL（HIJスタンダード = regulation_sidebar_form=XY）
-BASE_URL = (
+BASE = (
     "https://www.pokemon-card.com/card-search/index.php"
     "?keyword=&se_ta=&regulation_sidebar_form=XY"
-    "&pg={page}&illust=&sort=&page={page}"
+    "&pg={page}&illust=&sort=&kanji=&num=&hp=&expansion_code="
 )
 
 
-async def scrape_all_cards():
-    """全ページをめぐってカード情報を集める関数"""
+async def scrape():
     cards = []
+    seen = set()
 
     async with async_playwright() as p:
-        # ブラウザを起動（画面は表示しない＝headless）
-        browser = await p.chromium.launch(headless=True)
+        browser = await p.chromium.launch()
         page = await browser.new_page()
 
         page_num = 1
-        while True:
-            url = BASE_URL.format(page=page_num)
-            print(f"ページ {page_num} を読み込み中...")
-            await page.goto(url, wait_until="networkidle")
+        empty_streak = 0
 
-            # カード一覧が出てくるまで待つ（最大10秒）
+        while page_num <= 60:
+            url = BASE.format(page=page_num)
+            print(f"ページ {page_num} 読み込み中")
             try:
-                await page.wait_for_selector("ul.List_card li", timeout=10000)
-            except Exception:
-                print("カードが見つかりません。終了します。")
+                await page.goto(url, wait_until="networkidle", timeout=30000)
+            except Exception as e:
+                print(f"  読み込み失敗: {e}")
                 break
 
-            # ページ内のカードをすべて取得
-            items = await page.query_selector_all("ul.List_card li")
-            if not items:
-                break
+            await asyncio.sleep(2)
 
-            for item in items:
-                # カード名
-                name_el = await item.query_selector("img")
-                name = await name_el.get_attribute("alt") if name_el else None
+            imgs = await page.query_selector_all("img")
 
-                # カード画像URL
-                img_el = await item.query_selector("img")
-                img = await img_el.get_attribute("src") if img_el else None
+            found = 0
+            for img in imgs:
+                src = await img.get_attribute("src")
+                alt = await img.get_attribute("alt")
 
-                # カード詳細ページへのリンク
-                link_el = await item.query_selector("a")
-                link = await link_el.get_attribute("href") if link_el else None
+                if not src or "card_images" not in src:
+                    continue
+                if not alt or alt.strip() == "":
+                    continue
+                if src in seen:
+                    continue
+                seen.add(src)
 
-                if name:
-                    cards.append({
-                        "name": name,
-                        "image": img,
-                        "detail_url": link,
-                    })
+                cards.append({"name": alt.strip(), "image": src})
+                found += 1
 
-            print(f"  → ここまで合計 {len(cards)} 枚")
+            print(f"  → {found}枚、累計 {len(cards)}枚")
 
-            # 「次へ」ボタンがあるか確認。なければ終了
-            next_btn = await page.query_selector("a.next")
-            if not next_btn:
-                print("最後のページに到達しました。")
-                break
+            if found == 0:
+                empty_streak += 1
+                if empty_streak >= 2:
+                    print("終了します")
+                    break
+            else:
+                empty_streak = 0
 
             page_num += 1
-            # サーバーに優しく：1秒待つ
             await asyncio.sleep(1)
 
         await browser.close()
@@ -87,13 +74,10 @@ async def scrape_all_cards():
 
 
 async def main():
-    cards = await scrape_all_cards()
-
-    # cards.json に保存（日本語が文字化けしないよう ensure_ascii=False）
+    cards = await scrape()
     with open("data/cards.json", "w", encoding="utf-8") as f:
         json.dump(cards, f, ensure_ascii=False, indent=2)
-
-    print(f"\n完了！ 合計 {len(cards)} 枚を data/cards.json に保存しました。")
+    print(f"完了！ {len(cards)}枚を保存しました。")
 
 
 if __name__ == "__main__":
