@@ -16,43 +16,45 @@ async def extract(page):
         m = re.search(r"/(\d+)_([PTE])_", src)
         if not m:
             continue
-        txt = await li.inner_text()
-        stage = "2進化" if "2 進化" in txt else "1進化" if "1 進化" in txt else "たね" if "たね" in txt else "-"
-        hpm = re.search(r"HP\s*(\d+)", txt)
         got.append({
             "id": m.group(1), "name": alt.strip(), "code": m.group(2),
             "image": src if src.startswith("http") else "https://www.pokemon-card.com" + src,
             "type": "ポケモン" if m.group(2)=="P" else "エネルギー" if m.group(2)=="E" else "トレーナーズ",
-            "stage": stage if m.group(2)=="P" else "-",
-            "hp": hpm.group(1) if hpm else None,
+            "stage": "-", "hp": None,
             "is_ex": "ex" in alt.strip().lower(),
             "is_mega": ("メガ" in alt.strip() or alt.strip().startswith("M")),
             "evolvesFrom": None,
         })
     return got
 
-async def get_evolves_from(page, card_id):
-    url = f"https://www.pokemon-card.com/card-search/details.php/card/{card_id}/regu/XY"
+async def fill_pokemon_detail(page, card):
+    url = f"https://www.pokemon-card.com/card-search/details.php/card/{card['id']}/regu/XY"
     try:
         await page.goto(url, wait_until="domcontentloaded", timeout=40000)
         await page.wait_for_selector("h1", timeout=10000)
     except Exception:
-        return None
+        return
+    body = await page.inner_text("body")
+    if "2 進化" in body:
+        card["stage"] = "2進化"
+    elif "1 進化" in body:
+        card["stage"] = "1進化"
+    elif "たね" in body:
+        card["stage"] = "たね"
+    hpm = re.search(r"HP\s*(\d+)", body)
+    if hpm:
+        card["hp"] = hpm.group(1)
     evos = await page.query_selector_all("div.evolution")
-    if not evos:
-        return None
-    names = []
-    on_index = -1
-    for i, ev in enumerate(evos):
-        a = await ev.query_selector("a")
-        nm = (await a.inner_text()).strip() if a else ""
-        cls = await ev.get_attribute("class") or ""
-        names.append(nm)
-        if "ev_on" in cls:
-            on_index = i
-    if on_index > 0:
-        return names[on_index - 1]
-    return None
+    if evos:
+        names, on_index = [], -1
+        for i, ev in enumerate(evos):
+            a = await ev.query_selector("a")
+            names.append((await a.inner_text()).strip() if a else "")
+            cls = await ev.get_attribute("class") or ""
+            if "ev_on" in cls:
+                on_index = i
+        if on_index > 0:
+            card["evolvesFrom"] = names[on_index - 1]
 
 async def main():
     cards = {}
@@ -86,15 +88,13 @@ async def main():
             if pno % 20 == 0:
                 print(f"list {pno}/{int(max_page)} total {len(cards)}")
         print(f"list done {len(cards)}")
-        evo_targets = [c for c in cards.values() if c["stage"] in ("1進化", "2進化")]
-        print(f"evo targets {len(evo_targets)}")
-        for i, c in enumerate(evo_targets, 1):
-            ef = await get_evolves_from(page, c["id"])
-            if ef:
-                c["evolvesFrom"] = ef
-            if i % 20 == 0:
-                print(f"  evo {i}/{len(evo_targets)}")
-            await asyncio.sleep(0.3)
+        pokes = [c for c in cards.values() if c["code"] == "P"]
+        print(f"pokemon detail targets {len(pokes)}")
+        for i, c in enumerate(pokes, 1):
+            await fill_pokemon_detail(page, c)
+            if i % 25 == 0:
+                print(f"  detail {i}/{len(pokes)}")
+            await asyncio.sleep(0.25)
         await b.close()
     result = list(cards.values())
     with open("data/cards.json", "w", encoding="utf-8") as f:
