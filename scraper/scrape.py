@@ -4,15 +4,21 @@ from playwright.async_api import async_playwright
 LIST = "https://www.pokemon-card.com/card-search/index.php?keyword=&se_ta=&regulation_sidebar_form=XY&pg={p}"
 
 async def fetch_page(page, p):
-    for attempt in range(4):
+    for attempt in range(5):
         try:
-            await page.goto(LIST.format(p=p), wait_until="networkidle", timeout=60000)
-            await page.wait_for_selector("img[src*='card_images']", timeout=20000)
-            await asyncio.sleep(2)
+            await page.goto(LIST.format(p=p), wait_until="networkidle", timeout=90000)
         except Exception:
-            print(f"  page {p} retry {attempt+1}")
-            await asyncio.sleep(3)
+            print(f"  page {p} goto retry {attempt+1}")
+            await asyncio.sleep(4)
             continue
+        try:
+            await page.wait_for_function(
+                "document.querySelectorAll(\"img[src*='card_images']\").length >= 5",
+                timeout=25000
+            )
+        except Exception:
+            pass
+        await asyncio.sleep(5)
         got = []
         for li in await page.query_selector_all("li"):
             img = await li.query_selector("img[src*='card_images']")
@@ -39,8 +45,8 @@ async def fetch_page(page, p):
             })
         if got:
             return got
-        print(f"  page {p} empty retry")
-        await asyncio.sleep(3)
+        print(f"  page {p} empty retry {attempt+1}")
+        await asyncio.sleep(4)
     return []
 
 async def main():
@@ -48,14 +54,11 @@ async def main():
     async with async_playwright() as pw:
         b = await pw.chromium.launch()
         page = await b.new_page()
-        TOTAL_PAGES = 138
-        for p in range(1, TOTAL_PAGES + 1):
+        for p in range(1, 139):
             got = await fetch_page(page, p)
-            new = 0
+            new = sum(1 for c in got if c["id"] not in cards)
             for c in got:
-                if c["id"] not in cards:
-                    cards[c["id"]] = c
-                    new += 1
+                cards[c["id"]] = c
             print(f"page {p}: +{new} total {len(cards)}")
             await asyncio.sleep(0.3)
         await b.close()
