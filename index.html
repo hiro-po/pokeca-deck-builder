@@ -496,6 +496,21 @@ header {
 </div>
 </div>
 
+<div class="page" id="tab-ace">
+<div class="container">
+  <div class="panel">
+    <div class="panel-head">エースを選んで構築案を作る</div>
+    <div class="panel-body">
+      <div class="search-wrap">
+        <input class="search-input" type="search" id="aceSearch" placeholder="エースにするポケモンを検索..." oninput="renderAceCandidates()" autocomplete="off">
+      </div>
+      <div class="card-list" id="aceCandidates"></div>
+    </div>
+  </div>
+  <div id="proposalArea"></div>
+</div>
+</div>
+
 <div class="page" id="tab-deck">
 <div class="container">
   <div class="panel">
@@ -535,6 +550,7 @@ header {
 
 <nav class="bottom-nav">
   <div class="nav-item active" data-tab="build" onclick="switchTab(this)"><span class="nav-icon">🔍</span><span class="nav-label">構築</span></div>
+  <div class="nav-item" data-tab="ace" onclick="switchTab(this)"><span class="nav-icon">⭐</span><span class="nav-label">エース</span></div>
   <div class="nav-item" data-tab="deck" onclick="switchTab(this)"><span class="nav-icon">🃏</span><span class="nav-label">デッキ</span></div>
   <div class="nav-item" data-tab="check" onclick="switchTab(this)"><span class="nav-icon">✅</span><span class="nav-label">チェック</span></div>
   <div class="nav-item" data-tab="save" onclick="switchTab(this)"><span class="nav-icon">💾</span><span class="nav-label">保存</span></div>
@@ -542,6 +558,145 @@ header {
 
 <div class="toast" id="toast"></div>
 <script>
+// ===== エース構築ロジック =====
+
+// 進化ラインを解決する（エースから進化元をたどる）
+// メガexの補完込み
+function resolveEvolutionLine(ace, db) {
+  const line = [ace];        // 末端（エース）から先頭（たね）へ
+  let current = ace;
+  const guard = new Set([ace.id]);
+
+  while (true) {
+    let prevName = current.evolvesFrom;
+
+    // メガex補完：evolvesFromがnullでもメガなら名前から進化元を推定
+    if (!prevName && current.is_mega) {
+      // 「メガカイリューex」→「カイリュー」を含む2進化候補、なければ近い名前
+      const base = current.name.replace(/^メガ/, "").replace(/ex$/i, "").trim();
+      // baseを含む名前で、stageが1つ下のものを探す
+      const wantStage = current.stage === "2進化" ? "1進化" : "たね";
+      const cand = db.find(c =>
+        c.type === "ポケモン" &&
+        c.stage === wantStage &&
+        c.name.includes(base) &&
+        c.name !== current.name
+      );
+      if (cand) prevName = cand.name;
+    }
+
+    if (!prevName) break;
+
+    // prevNameに一致するカードをDBから探す（同名複数あれば最初の1枚）
+    const prev = db.find(c => c.name === prevName && c.type === "ポケモン");
+    if (!prev || guard.has(prev.id)) break;
+    guard.add(prev.id);
+    line.unshift(prev);  // 先頭に追加（たね側）
+    current = prev;
+  }
+  return line;  // [たね, 1進化, 2進化(エース)] の順
+}
+
+// エースを中心に60枚デッキ案を作る
+function buildDeckProposal(ace, db, style) {
+  const deck = {};  // id -> count
+  const line = resolveEvolutionLine(ace, db);
+
+  // スタイルごとのエース枚数設定
+  const aceCounts = {
+    speed:   { ace: 3, mid: 3, basic: 4 },  // 速攻：エース濃く
+    balance: { ace: 2, mid: 2, basic: 3 },  // バランス
+    control: { ace: 2, mid: 2, basic: 3 },  // コントロール
+  }[style];
+
+  // 進化ラインを枚数配分（進化元 ≧ 進化先 になるよう）
+  const n = line.length;
+  line.forEach((card, idx) => {
+    // idx=0が一番下（たね）、末尾がエース
+    let cnt;
+    if (idx === n - 1) cnt = aceCounts.ace;        // エース
+    else if (idx === 0) cnt = aceCounts.basic;     // たね
+    else cnt = aceCounts.mid;                       // 中間
+    // 進化元 >= 進化先 を保証
+    deck[card.id] = cnt;
+  });
+  // たね>=中間>=エース になるよう調整
+  for (let i = n - 1; i > 0; i--) {
+    if ((deck[line[i-1].id] || 0) < (deck[line[i].id] || 0)) {
+      deck[line[i-1].id] = deck[line[i].id];
+    }
+  }
+
+  // 残り枚数を計算
+  let used = Object.values(deck).reduce((a, b) => a + b, 0);
+
+  // 定番トレーナーズを探して入れる（存在するものだけ）
+  const findCard = (names) => {
+    for (const nm of names) {
+      const c = db.find(x => x.name === nm);
+      if (c) return c;
+    }
+    return null;
+  };
+
+  // スタイル別のトレーナーズ構成
+  const trainerPlan = {
+    speed: [
+      { names: ["ネストボール"], count: 4 },
+      { names: ["ハイパーボール"], count: 4 },
+      { names: ["ボスの指令"], count: 3 },
+      { names: ["博士の研究", "ナンジャモ"], count: 4 },
+      { names: ["きずぐすり"], count: 2 },
+    ],
+    balance: [
+      { names: ["ネストボール"], count: 3 },
+      { names: ["ハイパーボール"], count: 3 },
+      { names: ["博士の研究", "ナンジャモ"], count: 4 },
+      { names: ["ボスの指令"], count: 2 },
+      { names: ["大きなおまもり"], count: 2 },
+      { names: ["ふしぎなアメ"], count: 3 },
+    ],
+    control: [
+      { names: ["ナンジャモ", "博士の研究"], count: 4 },
+      { names: ["ハイパーボール"], count: 3 },
+      { names: ["ボスの指令"], count: 3 },
+      { names: ["大きなおまもり"], count: 2 },
+      { names: ["崩れたスタジアム", "ポケモンリーグ本部"], count: 2 },
+      { names: ["カウンターキャッチャー"], count: 2 },
+    ],
+  }[style];
+
+  trainerPlan.forEach(({ names, count }) => {
+    const c = findCard(names);
+    if (c && used < 60) {
+      const add = Math.min(count, 60 - used);
+      deck[c.id] = (deck[c.id] || 0) + add;
+      used += add;
+    }
+  });
+
+  // 基本エネルギーで残りを埋める（エースの技に合うタイプを推定）
+  const basicEnergy = db.find(c =>
+    c.type === "エネルギー" && (c.name.includes("基本") || c.name.includes("エネルギー"))
+  );
+  if (basicEnergy && used < 60) {
+    deck[basicEnergy.id] = (deck[basicEnergy.id] || 0) + (60 - used);
+    used = 60;
+  }
+
+  return { deck, line, used };
+}
+
+// 3つの構築案を生成
+function generateProposals(ace, db) {
+  return [
+    { key: "speed",   label: "速攻型",       desc: "エースを早く立てて押し切る", ...buildDeckProposal(ace, db, "speed") },
+    { key: "balance", label: "バランス型",   desc: "攻守のバランスを重視",       ...buildDeckProposal(ace, db, "balance") },
+    { key: "control", label: "コントロール型", desc: "盤面を整えて安定して戦う",   ...buildDeckProposal(ace, db, "control") },
+  ];
+}
+
+
 // ===== カードデータ（GitHubのcards.jsonから読み込む）=====
 let CARD_DB = [];
 let deck = {};
@@ -594,6 +749,7 @@ function switchTab(el) {
   if (tab === 'deck')  renderDeck();
   if (tab === 'check') { renderValidation(); renderStats(); }
   if (tab === 'save')  { renderSaved(); renderExport(); }
+  if (tab === 'ace')   renderAceCandidates();
 }
 
 // ===== カード検索 =====
@@ -820,6 +976,86 @@ function showToast(msg) {
   t.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+// ===== エース構築UI =====
+let currentProposals = null;
+
+function renderAceCandidates() {
+  const q = (document.getElementById('aceSearch').value || '').toLowerCase();
+  const el = document.getElementById('aceCandidates');
+  if (!q) {
+    el.innerHTML = '<div class="muted" style="padding:10px;text-align:center">エースにしたいポケモンを検索してください<br>（ex・メガexがおすすめ）</div>';
+    return;
+  }
+  const list = CARD_DB.filter(c =>
+    c.type === 'ポケモン' && c.name.toLowerCase().includes(q)
+  ).slice(0, 30);
+  el.innerHTML = '';
+  if (!list.length) {
+    el.innerHTML = '<div class="muted" style="padding:10px;text-align:center">見つかりません</div>';
+    return;
+  }
+  list.forEach(c => {
+    const tag = c.is_mega ? '🌟メガex' : c.is_ex ? '✨ex' : '';
+    const row = document.createElement('div');
+    row.className = 'card-row';
+    row.innerHTML = `
+      <div class="card-thumb">${c.image ? `<img src="${c.image}" style="width:100%;height:100%;object-fit:cover;border-radius:4px" loading="lazy">` : c.icon}</div>
+      <div class="card-info">
+        <div class="cn">${c.name} ${tag ? `<span class="tag tag-ex" style="font-size:9px">${tag}</span>` : ''}</div>
+        <div class="cm">${c.stage}${c.hp ? ' · HP' + c.hp : ''}</div>
+      </div>
+      <button class="btn-add" onclick="selectAce('${c.id}')">選ぶ</button>
+    `;
+    el.appendChild(row);
+  });
+}
+
+function selectAce(id) {
+  const ace = CARD_DB.find(c => c.id === id);
+  if (!ace) return;
+  currentProposals = generateProposals(ace, CARD_DB);
+  renderProposals(ace);
+}
+
+function renderProposals(ace) {
+  const el = document.getElementById('proposalArea');
+  let html = `<div class="panel"><div class="panel-head">エース：${ace.name}</div><div class="panel-body">`;
+  // 進化ライン表示
+  const line = currentProposals[0].line;
+  if (line.length > 1) {
+    html += `<div class="sec-title">進化ライン</div><div style="margin-bottom:10px">${line.map(c => c.name).join(' → ')}</div>`;
+  }
+  html += `</div></div>`;
+
+  currentProposals.forEach((p, i) => {
+    const total = Object.values(p.deck).reduce((a,b)=>a+b,0);
+    html += `<div class="panel"><div class="panel-head">${p.label}（${total}枚）</div><div class="panel-body">`;
+    html += `<div class="muted" style="margin-bottom:8px">${p.desc}</div>`;
+    // 内訳
+    const secs = { pokemon: [], trainer: [], energy: [] };
+    Object.entries(p.deck).forEach(([cid, cnt]) => {
+      const c = CARD_DB.find(x => x.id === cid);
+      if (!c) return;
+      const key = c.type === 'ポケモン' ? 'pokemon' : c.type === 'エネルギー' ? 'energy' : 'trainer';
+      secs[key].push(`${c.name}×${cnt}`);
+    });
+    if (secs.pokemon.length) html += `<div style="margin-bottom:4px"><b>ポケモン</b>：${secs.pokemon.join('、')}</div>`;
+    if (secs.trainer.length) html += `<div style="margin-bottom:4px"><b>トレーナーズ</b>：${secs.trainer.join('、')}</div>`;
+    if (secs.energy.length) html += `<div style="margin-bottom:8px"><b>エネルギー</b>：${secs.energy.join('、')}</div>`;
+    html += `<button class="btn-save" onclick="useProposal(${i})">この案をデッキに入れる</button>`;
+    html += `</div></div>`;
+  });
+  el.innerHTML = html;
+}
+
+function useProposal(i) {
+  const p = currentProposals[i];
+  deck = { ...p.deck };
+  filterCards();
+  switchTab(document.querySelector('[data-tab="deck"]'));
+  showToast(`${p.label}をデッキに読み込みました`);
 }
 
 // ===== 起動 =====
