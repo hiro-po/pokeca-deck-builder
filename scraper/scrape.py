@@ -27,6 +27,15 @@ async def extract(page):
         })
     return got
 
+def valid_evolves_from(self_name, evo_name):
+    if not evo_name:
+        return None
+    if evo_name == self_name:
+        return None
+    if evo_name in self_name or self_name in evo_name:
+        return None
+    return evo_name
+
 async def fill_pokemon_detail(page, card):
     url = f"https://www.pokemon-card.com/card-search/details.php/card/{card['id']}/regu/XY"
     try:
@@ -34,27 +43,38 @@ async def fill_pokemon_detail(page, card):
         await page.wait_for_selector("h1", timeout=10000)
     except Exception:
         return
-    body = await page.inner_text("body")
-    if "2 進化" in body:
-        card["stage"] = "2進化"
-    elif "1 進化" in body:
-        card["stage"] = "1進化"
-    elif "たね" in body:
-        card["stage"] = "たね"
-    hpm = re.search(r"HP\s*(\d+)", body)
-    if hpm:
-        card["hp"] = hpm.group(1)
-    evos = await page.query_selector_all("div.evolution")
-    if evos:
-        names, on_index = [], -1
-        for i, ev in enumerate(evos):
-            a = await ev.query_selector("a")
-            names.append((await a.inner_text()).strip() if a else "")
-            cls = await ev.get_attribute("class") or ""
-            if "ev_on" in cls:
-                on_index = i
-        if on_index > 0:
-            card["evolvesFrom"] = names[on_index - 1]
+    try:
+        t = await page.query_selector("span.type")
+        if t:
+            txt = (await t.inner_text()).strip()
+            if "2" in txt and "進化" in txt:
+                card["stage"] = "2進化"
+            elif "1" in txt and "進化" in txt:
+                card["stage"] = "1進化"
+            elif "たね" in txt:
+                card["stage"] = "たね"
+    except Exception:
+        pass
+    try:
+        h = await page.query_selector("span.hp-num")
+        if h:
+            hv = (await h.inner_text()).strip()
+            if hv.isdigit():
+                card["hp"] = hv
+    except Exception:
+        pass
+    line = []
+    for ev in await page.query_selector_all("div.evolution"):
+        cls = await ev.get_attribute("class") or ""
+        if "evbox" in cls:
+            continue
+        a = await ev.query_selector("a")
+        nm = (await a.inner_text()).strip() if a else ""
+        line.append((nm, "ev_on" in cls))
+    on_idx = next((i for i, (nm, on) in enumerate(line) if on), -1)
+    if on_idx >= 0 and on_idx + 1 < len(line):
+        cand = line[on_idx + 1][0]
+        card["evolvesFrom"] = valid_evolves_from(card["name"], cand)
 
 async def main():
     cards = {}
