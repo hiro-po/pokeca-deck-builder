@@ -1,14 +1,18 @@
-import json, re, asyncio
+import json, re, asyncio, os
 from playwright.async_api import async_playwright
+
+TEST = os.environ.get("TEST") == "1"
+TEST_PAGES = 3
+TEST_DETAILS = 10
 
 START = "https://www.pokemon-card.com/card-search/index.php?se_ta=&keyword=&regulation_sidebar_form=XY&pg=&illust=&sm_and_keyword=true"
 
 async def extract(page):
     try:
-        await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+        for _ in range(10):
+            await page.evaluate("window.scrollBy(0, 800)")
+            await asyncio.sleep(0.4)
         await asyncio.sleep(1)
-        await page.evaluate("window.scrollTo(0, 0)")
-        await asyncio.sleep(0.5)
     except Exception:
         pass
     got = []
@@ -97,6 +101,9 @@ async def main():
             max_page = 0
         if not max_page or max_page < 1:
             max_page = 140
+        if TEST:
+            max_page = TEST_PAGES
+            print(f"[TESTモード] 最初の{TEST_PAGES}ページだけ取得")
         print(f"maxPage = {max_page}")
         for pno in range(1, int(max_page) + 1):
             if pno > 1:
@@ -117,6 +124,9 @@ async def main():
                 print(f"page {pno}/{int(max_page)}: +{len(cards)-before} total {len(cards)}")
         print(f"list done {len(cards)}")
         pokes = [c for c in cards.values() if c["code"] == "P"]
+        if TEST:
+            pokes = pokes[:TEST_DETAILS]
+            print(f"[TESTモード] 詳細は{len(pokes)}枚だけ")
         print(f"pokemon detail targets {len(pokes)}")
         for i, c in enumerate(pokes, 1):
             await fill_pokemon_detail(page, c)
@@ -125,8 +135,12 @@ async def main():
             await asyncio.sleep(0.2)
         await b.close()
     result = list(cards.values())
-    with open("data/cards.json", "w", encoding="utf-8") as f:
+    outfile = "data/cards_test.json" if TEST else "data/cards.json"
+    with open(outfile, "w", encoding="utf-8") as f:
         json.dump(result, f, ensure_ascii=False, indent=2)
-    print(f"done {len(result)}")
+    print(f"done {len(result)} -> {outfile}")
+    if TEST:
+        for c in result[:5]:
+            print(f"  例: {c['name']} ({c['type']}/{c['stage']}) evo={c['evolvesFrom']}")
 
 asyncio.run(main())
