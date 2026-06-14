@@ -8,463 +8,315 @@
 <meta name="apple-mobile-web-app-title" content="ポケカDB">
 <title>ポケカ デッキビルダー</title>
 <style>
-/* ===== トークン ===== */
-:root {
-  --bg:      #0f1117;
-  --surf:    #1a1d27;
-  --surf2:   #23263a;
-  --border:  #2e3250;
-  --accent:  #5b8cff;
-  --red:     #ff6b6b;
-  --gold:    #f5c842;
-  --green:   #56e0a0;
-  --text:    #e8eaf6;
-  --muted:   #7b82a8;
-  --r:       10px;
-  --r2:      6px;
+/* ===== ポケカDB / Apple風デザイン ===== */
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
-  /* iPhone タップターゲット最小44px */
-  --tap: 44px;
+:root {
+  /* ポケカ裏面の紺青をベースに、Apple風の上品さを保つ */
+  --bg: #0a1230;          /* 深い紺（裏面の地の色） */
+  --bg-grad: radial-gradient(120% 80% at 50% 0%, #1a2a5e 0%, #0d1638 45%, #060c22 100%);
+  --surface: #141d42;     /* 紺がかった濃色パネル */
+  --surface-2: #1e2a55;
+  --surface-3: #2b3a6e;
+  --separator: rgba(120,140,210,0.18);
+  --text: #eef2ff;
+  --text-2: #aab4dd;
+  --text-3: #7d88b3;
+  --accent: #4d8dff;      /* 裏面の明るいブルー */
+  --accent-press: #2f6fe0;
+  --pokeball-red: #ee3c43;/* ポケボールの赤（アクセント差し色） */
+  --card-gold: #f5c518;   /* ポケカ裏面の縁の黄色（ボタンアクセント） */
+  --card-gold-press: #d9ac0a;
+  --green: #34d17a;
+  --red: #ff5a4d;
+  --yellow: #ffd60a;
+  --radius: 14px;
+  --radius-lg: 20px;
+  --nav-h: 64px;
+  --header-h: 52px;
 }
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-html { font-size: 15px; -webkit-text-size-adjust: 100%; }
+html, body {
+  background: var(--bg);
+  background-image: var(--bg-grad);
+  background-attachment: fixed;
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "Hiragino Sans", "Noto Sans JP", sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+}
 
 body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: -apple-system, 'Hiragino Kaku Gothic ProN', sans-serif;
-  line-height: 1.5;
-  /* iPhoneのノッチ・ホームバー対応 */
-  padding-bottom: env(safe-area-inset-bottom);
-  padding-left: env(safe-area-inset-left);
-  padding-right: env(safe-area-inset-right);
+  padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom));
+  min-height: 100vh;
 }
 
 /* ===== ヘッダー ===== */
 header {
-  background: var(--surf);
-  border-bottom: 1px solid var(--border);
-  padding: 0 16px;
+  position: sticky; top: 0; z-index: 50;
+  height: calc(var(--header-h) + env(safe-area-inset-top));
   padding-top: env(safe-area-inset-top);
-  height: calc(52px + env(safe-area-inset-top));
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  padding-bottom: 10px;
-  position: sticky;
-  top: 0;
-  z-index: 100;
+  display: flex; align-items: center; justify-content: space-between;
+  padding-left: 20px; padding-right: 20px;
+  background: rgba(20,29,66,0.72);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 0.5px solid var(--separator);
 }
-.logo { font-size: 16px; font-weight: 800; letter-spacing: .02em; }
-.logo span { color: var(--accent); }
+.logo { font-size: 19px; font-weight: 700; letter-spacing: -0.02em; }
+.logo span { color: var(--pokeball-red); }
 .reg-badge {
-  background: var(--accent);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-  padding: 3px 9px;
-  border-radius: 20px;
+  font-size: 12px; font-weight: 600; color: var(--text-2);
+  background: var(--surface-2);
+  padding: 5px 11px; border-radius: 100px;
 }
-
-/* ===== ボトムタブナビ（iPhone標準UI）===== */
-.bottom-nav {
-  position: fixed;
-  bottom: 0;
-  left: 0; right: 0;
-  background: var(--surf);
-  border-top: 1px solid var(--border);
-  display: flex;
-  padding-bottom: env(safe-area-inset-bottom);
-  z-index: 100;
-}
-.nav-item {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 8px 4px;
-  min-height: var(--tap);
-  color: var(--muted);
-  font-size: 10px;
-  gap: 3px;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  transition: color .15s;
-  user-select: none;
-}
-.nav-item.active { color: var(--accent); }
-.nav-item .nav-icon { font-size: 22px; line-height: 1; }
-.nav-item .nav-label { font-size: 10px; }
 
 /* ===== ページ ===== */
 .page { display: none; }
-.page.active { display: block; }
-.container {
-  padding: 14px 14px;
-  /* ボトムナビ分の余白 */
-  padding-bottom: calc(70px + env(safe-area-inset-bottom));
-}
+.page.active { display: block; animation: fade 0.3s ease; }
+@keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.container { padding: 16px; max-width: 720px; margin: 0 auto; }
 
 /* ===== パネル ===== */
 .panel {
-  background: var(--surf);
-  border: 1px solid var(--border);
-  border-radius: var(--r);
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  margin-bottom: 16px;
   overflow: hidden;
-  margin-bottom: 12px;
 }
 .panel-head {
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border);
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--muted);
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  font-size: 13px; font-weight: 600; color: var(--text-3);
+  text-transform: uppercase; letter-spacing: 0.03em;
+  padding: 16px 18px 8px;
 }
-.panel-body { padding: 12px; }
-
-/* ===== エース表示 ===== */
-.ace-zone {
-  background: linear-gradient(135deg, #1a2040, #0f1117);
-  border: 1px solid var(--accent);
-  border-radius: var(--r);
-  padding: 14px;
-  margin-bottom: 12px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.ace-img {
-  width: 54px; height: 76px;
-  background: var(--surf2);
-  border-radius: 6px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 26px; flex-shrink: 0;
-  border: 1px solid var(--border);
-}
-.ace-info { flex: 1; min-width: 0; }
-.ace-name { font-size: 15px; font-weight: 700; }
-.ace-meta { display: flex; gap: 5px; margin-top: 5px; flex-wrap: wrap; }
-.tag {
-  font-size: 10px; font-weight: 700;
-  padding: 2px 7px; border-radius: 12px;
-}
-.tag-mega  { background: #3a1a5a; color: #c084fc; border: 1px solid #7e3bbf; }
-.tag-ex    { background: #1a3a5a; color: #60a5fa; border: 1px solid #3b82f6; }
-.tag-side3 { background: #3a1a1a; color: #f87171; border: 1px solid #ef4444; }
-.tag-side2 { background: #1a3020; color: #4ade80; border: 1px solid #22c55e; }
-.tag-side1 { background: #252525; color: #a1a1aa; border: 1px solid #52525b; }
-.tag-type  { background: var(--surf2); color: var(--muted); border: 1px solid var(--border); }
-.ace-change {
-  display: inline-block;
-  margin-top: 6px;
-  font-size: 12px;
-  color: var(--accent);
-  text-decoration: underline;
-  min-height: var(--tap);
-  line-height: var(--tap);
-}
-
-/* ===== 進化ライン ===== */
-.evo-line {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px;
-  background: var(--surf2);
-  border-radius: var(--r2);
-  margin-bottom: 8px;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-.evo-card {
-  background: var(--surf);
-  border: 1.5px solid var(--border);
-  border-radius: var(--r2);
-  padding: 8px 10px;
-  min-width: 76px;
-  display: flex; flex-direction: column; align-items: center; gap: 3px;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  flex-shrink: 0;
-}
-.evo-card.added { border-color: var(--green); background: #0d2018; }
-.evo-card .stage { font-size: 9px; color: var(--muted); }
-.evo-card .cname { font-size: 11px; font-weight: 700; text-align: center; }
-.evo-card .cadd  { font-size: 10px; color: var(--accent); }
-.evo-arrow { color: var(--muted); font-size: 16px; flex-shrink: 0; }
-
-/* ===== アラート ===== */
-.alert {
-  border-radius: var(--r2);
-  padding: 10px 12px;
-  font-size: 13px;
-  margin-bottom: 10px;
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-.alert-warn    { background: #2a1a0a; border: 1px solid #f59e0b; color: #fbbf24; }
-.alert-error   { background: #2a0a0a; border: 1px solid var(--red); color: #fca5a5; }
-.alert-success { background: #0a2a14; border: 1px solid var(--green); color: #6ee7b7; }
+.panel-body { padding: 0 18px 18px; }
+.sec-title { font-size: 13px; font-weight: 600; color: var(--text-3); margin-bottom: 8px; }
 
 /* ===== 検索 ===== */
-.search-wrap { margin-bottom: 10px; }
+.search-wrap { margin-bottom: 12px; }
 .search-input {
-  width: 100%;
-  background: var(--surf2);
-  border: 1px solid var(--border);
-  border-radius: var(--r2);
-  padding: 10px 14px;
-  color: var(--text);
-  font-size: 16px; /* iOS ズーム防止 */
+  width: 100%; font-size: 16px; color: var(--text);
+  background: var(--surface-2);
+  border: none; border-radius: 11px;
+  padding: 11px 14px;
   outline: none;
-  -webkit-appearance: none;
 }
-.search-input:focus { border-color: var(--accent); }
-
-.filter-row {
-  display: flex; gap: 6px; flex-wrap: nowrap;
-  overflow-x: auto; -webkit-overflow-scrolling: touch;
-  margin-bottom: 10px;
-  padding-bottom: 2px;
-}
+.search-input::placeholder { color: var(--text-3); }
+.filter-row { display: flex; gap: 8px; margin-bottom: 14px; }
 .filter-row select {
-  background: var(--surf2);
-  border: 1px solid var(--border);
-  border-radius: var(--r2);
-  padding: 8px 10px;
-  color: var(--text);
-  font-size: 13px;
-  outline: none;
-  flex-shrink: 0;
-  -webkit-appearance: none;
-  min-height: var(--tap);
+  flex: 1; font-size: 15px; color: var(--text);
+  background: var(--surface-2);
+  border: none; border-radius: 11px;
+  padding: 10px 12px; outline: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%238e8e93' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 30px;
 }
 
 /* ===== カードリスト ===== */
-.card-list { display: flex; flex-direction: column; gap: 8px; }
+.card-list { display: flex; flex-direction: column; gap: 2px; }
 .card-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px;
-  background: var(--surf2);
-  border: 1px solid var(--border);
-  border-radius: var(--r2);
-  -webkit-tap-highlight-color: transparent;
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 0;
+  border-bottom: 0.5px solid var(--separator);
 }
+.card-row:last-child { border-bottom: none; }
 .card-thumb {
-  width: 38px; height: 52px;
-  background: var(--surf);
-  border-radius: 4px;
+  width: 44px; height: 61px; flex-shrink: 0;
+  border-radius: 6px; overflow: hidden;
+  background: var(--surface-2);
   display: flex; align-items: center; justify-content: center;
-  font-size: 20px; flex-shrink: 0;
-  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: transform 0.15s ease;
 }
+.card-thumb:active { transform: scale(0.95); }
 .card-info { flex: 1; min-width: 0; }
-.card-info .cn {
-  font-size: 14px; font-weight: 600;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+.card-info .cn { font-size: 15px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-info .cm { font-size: 13px; color: var(--text-3); margin-top: 1px; }
+.tag {
+  display: inline-block; font-size: 10px; font-weight: 600;
+  padding: 1px 6px; border-radius: 5px; margin-left: 4px;
+  vertical-align: middle;
 }
-.card-info .cm { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.tag-ex { background: rgba(10,132,255,0.18); color: #4da3ff; }
+.tag-mega { background: rgba(255,214,10,0.18); color: var(--yellow); }
+
+/* ===== ボタン ===== */
 .btn-add {
-  background: var(--accent);
-  color: #fff; border: none;
-  border-radius: var(--r2);
-  width: var(--tap); height: var(--tap);
-  font-size: 22px;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-  -webkit-tap-highlight-color: transparent;
+  flex-shrink: 0; font-size: 14px; font-weight: 600;
+  color: var(--card-gold); background: var(--surface-2);
+  border: none; border-radius: 100px;
+  padding: 7px 16px; cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
 }
-.btn-add:disabled { background: var(--border); color: var(--muted); }
+.btn-add:active { transform: scale(0.94); background: var(--surface-3); }
+.btn-add:disabled { color: var(--text-3); opacity: 0.5; }
+.btn-save {
+  width: 100%; font-size: 16px; font-weight: 600;
+  color: #1a1400; background: var(--card-gold);
+  border: none; border-radius: 12px;
+  padding: 13px; cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+.btn-save:active { transform: scale(0.98); background: var(--card-gold-press); }
+.btn-copy {
+  width: 100%; font-size: 15px; font-weight: 600;
+  color: var(--card-gold); background: var(--surface-2);
+  border: none; border-radius: 12px;
+  padding: 12px; cursor: pointer; margin-top: 10px;
+}
+.btn-copy:active { background: var(--surface-3); }
 
 /* ===== デッキカウンター ===== */
-.deck-counter-bar {
-  display: flex; align-items: center; gap: 10px;
-  margin-bottom: 8px;
-}
-.counter-num { font-size: 28px; font-weight: 800; color: var(--accent); }
+.deck-counter-bar { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; }
+.counter-num { font-size: 40px; font-weight: 700; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
 .counter-num.full { color: var(--green); }
 .counter-num.over { color: var(--red); }
-.counter-label { font-size: 13px; color: var(--muted); }
-.progress-wrap { margin-bottom: 14px; }
-.progress-bar {
-  height: 5px; background: var(--border);
-  border-radius: 3px; overflow: hidden;
-}
-.progress-fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width .3s; }
+.counter-label { font-size: 15px; color: var(--text-3); }
+.progress-wrap { margin-bottom: 18px; }
+.progress-bar { height: 6px; background: var(--surface-2); border-radius: 100px; overflow: hidden; }
+.progress-fill { height: 100%; background: var(--accent); border-radius: 100px; transition: width 0.4s cubic-bezier(0.4,0,0.2,1); }
 
-/* ===== デッキリスト ===== */
-.deck-section { margin-bottom: 14px; }
+/* ===== デッキセクション ===== */
+.deck-section { margin-bottom: 16px; }
 .deck-sec-head {
-  font-size: 11px; font-weight: 700; color: var(--muted);
-  letter-spacing: .08em; text-transform: uppercase;
-  padding: 4px 0; border-bottom: 1px solid var(--border);
-  margin-bottom: 8px;
+  font-size: 13px; font-weight: 600; color: var(--text-3);
   display: flex; justify-content: space-between;
+  padding-bottom: 6px; margin-bottom: 4px;
+  border-bottom: 0.5px solid var(--separator);
 }
-.deck-item {
-  display: flex; align-items: center; gap: 8px;
-  padding: 6px 0; font-size: 13px;
-  border-bottom: 1px solid #1e2135;
-}
-.deck-item:last-child { border-bottom: none; }
-.di-icon { font-size: 18px; flex-shrink: 0; }
-.di-name { flex: 1; }
-.di-ctrl { display: flex; align-items: center; gap: 6px; }
+.deck-item { display: flex; align-items: center; gap: 10px; padding: 7px 0; }
+.di-name { flex: 1; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.di-ctrl { display: flex; align-items: center; gap: 10px; }
+.di-num { font-size: 15px; font-weight: 600; min-width: 16px; text-align: center; font-variant-numeric: tabular-nums; }
 .btn-sm {
-  background: var(--surf2);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  width: 32px; height: 32px;
-  font-size: 18px; color: var(--text);
-  display: flex; align-items: center; justify-content: center;
-  -webkit-tap-highlight-color: transparent;
+  width: 30px; height: 30px; border-radius: 50%;
+  border: none; background: var(--surface-2); color: var(--card-gold);
+  font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, transform 0.1s;
 }
-.di-num { width: 22px; text-align: center; font-weight: 700; }
+.btn-sm:active { transform: scale(0.9); background: var(--surface-3); }
 
 /* ===== バリデーション ===== */
 .valid-list { display: flex; flex-direction: column; gap: 8px; }
-.valid-item {
-  display: flex; align-items: flex-start; gap: 10px;
-  font-size: 13px; padding: 10px 12px;
-  background: var(--surf2); border-radius: var(--r2);
-}
-.valid-item.ok   { border-left: 3px solid var(--green); }
-.valid-item.ng   { border-left: 3px solid var(--red); }
-.valid-item.warn { border-left: 3px solid var(--gold); background: #1e1a0a; }
-.vi-icon { font-size: 16px; flex-shrink: 0; padding-top: 1px; }
-.vi-label { font-weight: 700; margin-bottom: 2px; }
-.vi-detail { font-size: 12px; color: var(--muted); }
-
-/* ===== 構築案提案 ===== */
-.proposal-list { display: flex; flex-direction: column; gap: 10px; }
-.proposal-card {
-  background: var(--surf);
-  border: 1px solid var(--border);
-  border-radius: var(--r);
-  padding: 14px;
-}
-.pc-label { font-size: 10px; font-weight: 700; color: var(--muted); letter-spacing: .08em; margin-bottom: 4px; }
-.pc-name  { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
-.pc-breakdown { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
-.pc-row { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
-.pc-row span:last-child { color: var(--text); font-weight: 600; }
-.btn-load {
-  width: 100%; background: var(--accent); color: #fff;
-  border: none; border-radius: var(--r2);
-  padding: 0; height: var(--tap);
-  font-size: 14px; font-weight: 700;
-  -webkit-tap-highlight-color: transparent;
-}
+.valid-item { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: 12px; background: var(--surface-2); }
+.valid-item .vi-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 7px; flex-shrink: 0; }
+.valid-item.ok .vi-dot { background: var(--green); }
+.valid-item.ng .vi-dot { background: var(--red); }
+.valid-item.warn .vi-dot { background: var(--yellow); }
+.vi-label { font-size: 15px; font-weight: 500; }
+.vi-detail { font-size: 13px; color: var(--text-3); margin-top: 1px; }
+.alert { padding: 12px 14px; border-radius: 12px; font-size: 14px; font-weight: 500; margin-bottom: 12px; }
+.alert-success { background: rgba(48,209,88,0.15); color: var(--green); }
 
 /* ===== 統計 ===== */
-.stat-bars { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
-.stat-row { display: flex; align-items: center; gap: 10px; font-size: 13px; }
-.stat-label { width: 90px; color: var(--muted); flex-shrink: 0; font-size: 12px; }
-.stat-bar-wrap { flex: 1; height: 10px; background: var(--border); border-radius: 5px; overflow: hidden; }
-.stat-fill { height: 100%; border-radius: 5px; transition: width .4s; }
-.stat-num { width: 28px; text-align: right; font-weight: 700; }
+.stat-bars { display: flex; flex-direction: column; gap: 12px; }
+.stat-row { display: flex; align-items: center; gap: 12px; }
+.stat-label { font-size: 14px; width: 84px; color: var(--text-2); }
+.stat-bar-wrap { flex: 1; height: 8px; background: var(--surface-2); border-radius: 100px; overflow: hidden; }
+.stat-fill { height: 100%; border-radius: 100px; transition: width 0.4s ease; }
+.stat-num { font-size: 14px; font-weight: 600; width: 28px; text-align: right; font-variant-numeric: tabular-nums; }
 
 /* ===== 保存 ===== */
-.save-form { display: flex; gap: 8px; margin-bottom: 14px; }
+.save-form { display: flex; gap: 8px; }
 .save-form input {
-  flex: 1; background: var(--surf2);
-  border: 1px solid var(--border); border-radius: var(--r2);
-  padding: 0 12px; height: var(--tap);
-  color: var(--text); font-size: 16px; outline: none;
-  -webkit-appearance: none;
+  flex: 1; font-size: 16px; color: var(--text);
+  background: var(--surface-2); border: none; border-radius: 11px;
+  padding: 11px 14px; outline: none;
 }
-.save-form input:focus { border-color: var(--accent); }
-.btn-save {
-  background: var(--green); color: #0a1a0f;
-  border: none; border-radius: var(--r2);
-  padding: 0 16px; height: var(--tap);
-  font-size: 14px; font-weight: 700; white-space: nowrap;
-  -webkit-tap-highlight-color: transparent;
-}
+.save-form .btn-save { width: auto; padding: 11px 20px; }
 .saved-list { display: flex; flex-direction: column; gap: 8px; }
-.saved-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 12px; background: var(--surf2);
-  border: 1px solid var(--border); border-radius: var(--r2);
-}
-.si-info { flex: 1; min-width: 0; }
-.si-name { font-size: 14px; font-weight: 600; }
-.si-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.saved-item { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: var(--surface-2); border-radius: 12px; }
+.si-info { flex: 1; }
+.si-name { font-size: 15px; font-weight: 500; }
+.si-meta { font-size: 13px; color: var(--text-3); margin-top: 1px; }
 .si-btns { display: flex; gap: 6px; }
-.btn-ghost {
-  background: none; border: 1px solid var(--border);
-  color: var(--muted); border-radius: var(--r2);
-  padding: 6px 12px; font-size: 12px;
-  min-height: var(--tap);
-  -webkit-tap-highlight-color: transparent;
+.btn-ghost, .btn-del {
+  font-size: 13px; font-weight: 600; border: none; border-radius: 8px;
+  padding: 6px 12px; cursor: pointer;
 }
-.btn-del {
-  background: none; border: 1px solid var(--border);
-  color: var(--red); border-radius: var(--r2);
-  padding: 6px 12px; font-size: 12px;
-  min-height: var(--tap);
-}
-
-/* ===== エクスポート ===== */
+.btn-ghost { background: var(--surface-3); color: var(--card-gold); }
+.btn-del { background: var(--surface-3); color: var(--red); }
 .export-area textarea {
-  width: 100%;
-  background: var(--surf2); border: 1px solid var(--border);
-  border-radius: var(--r2); padding: 12px;
-  color: var(--text); font-size: 13px;
-  font-family: 'Courier New', monospace;
-  resize: none; height: 220px; outline: none;
-  margin-bottom: 10px;
-  -webkit-appearance: none;
+  width: 100%; min-height: 180px; font-size: 13px; line-height: 1.6;
+  color: var(--text); background: var(--surface-2);
+  border: none; border-radius: 12px; padding: 14px;
+  outline: none; resize: vertical;
+  font-family: "SF Mono", ui-monospace, monospace;
 }
-.btn-copy {
-  width: 100%; height: var(--tap);
-  background: var(--surf2); border: 1px solid var(--accent);
-  color: var(--accent); border-radius: var(--r2);
-  font-size: 15px; font-weight: 700;
-  -webkit-tap-highlight-color: transparent;
+.muted { color: var(--text-3); font-size: 14px; }
+
+/* ===== ボトムナビ ===== */
+.bottom-nav {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 50;
+  height: calc(var(--nav-h) + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  display: flex;
+  background: rgba(20,29,66,0.8);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-top: 0.5px solid var(--separator);
 }
+.nav-item {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px; cursor: pointer; color: var(--text-3);
+  transition: color 0.15s;
+}
+.nav-item.active { color: var(--accent); }
+.nav-item svg { width: 26px; height: 26px; }
+.nav-label { font-size: 10px; font-weight: 500; letter-spacing: 0; }
+
+/* ===== カードプレビュー モーダル ===== */
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  display: none; align-items: center; justify-content: center;
+  padding: 24px;
+  animation: fade 0.2s ease;
+}
+.modal-backdrop.show { display: flex; }
+.modal-card {
+  background: var(--surface); border-radius: var(--radius-lg);
+  padding: 20px; max-width: 340px; width: 100%;
+  text-align: center;
+  animation: pop 0.25s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes pop { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+.modal-card img { width: 100%; border-radius: 10px; margin-bottom: 16px; }
+.modal-card .mc-name { font-size: 19px; font-weight: 700; margin-bottom: 4px; }
+.modal-card .mc-meta { font-size: 14px; color: var(--text-3); margin-bottom: 16px; }
+.modal-actions { display: flex; gap: 10px; }
+.modal-actions button { flex: 1; padding: 13px; border-radius: 12px; border: none; font-size: 16px; font-weight: 600; cursor: pointer; }
+.modal-close { background: var(--surface-2); color: var(--text-2); }
+.modal-add { background: var(--card-gold); color: #1a1400; }
 
 /* ===== トースト ===== */
 .toast {
-  position: fixed;
-  bottom: calc(70px + env(safe-area-inset-bottom) + 10px);
-  left: 50%; transform: translateX(-50%) translateY(10px);
-  background: var(--surf);
-  border: 1px solid var(--green); color: var(--green);
-  padding: 10px 20px; border-radius: 20px;
-  font-size: 13px; font-weight: 600;
-  opacity: 0; transition: opacity .2s, transform .2s;
-  z-index: 999; pointer-events: none;
-  white-space: nowrap;
+  position: fixed; left: 50%; bottom: calc(var(--nav-h) + 24px + env(safe-area-inset-bottom));
+  transform: translateX(-50%) translateY(20px);
+  background: var(--surface-3); color: var(--text);
+  font-size: 14px; font-weight: 500;
+  padding: 11px 20px; border-radius: 100px;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.25s, transform 0.25s;
+  z-index: 200;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.4);
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-/* ===== ユーティリティ ===== */
-.mt8  { margin-top: 8px; }
-.mt12 { margin-top: 12px; }
-.sec-title { font-size: 13px; font-weight: 700; margin-bottom: 10px; }
-.muted { color: var(--muted); font-size: 12px; }
-
-/* ===== スクロールバー（Safari）===== */
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+/* 構築案カード内 */
+.proposal-line { font-size: 14px; color: var(--text-2); margin-bottom: 10px; }
+.proposal-cat { font-size: 14px; margin-bottom: 4px; }
+.proposal-cat b { color: var(--text); font-weight: 600; }
 
 </style>
 </head>
 <body>
-
 
 <header>
   <div class="logo">ポケカ<span>DB</span></div>
@@ -473,21 +325,21 @@ header {
 
 <div class="page active" id="tab-build">
 <div class="container">
-  <div class="alert alert-success" id="loadStatus">カードデータを読み込み中...</div>
+  <div class="alert alert-success" id="loadStatus">カードを読み込んでいます…</div>
   <div class="panel">
-    <div class="panel-head">カード検索</div>
+    <div class="panel-head">カードを探す</div>
     <div class="panel-body">
       <div class="search-wrap">
-        <input class="search-input" type="search" id="searchInput" placeholder="カード名で検索..." oninput="filterCards()" autocomplete="off">
+        <input class="search-input" type="search" id="searchInput" placeholder="カード名で検索" oninput="filterCards()" autocomplete="off">
       </div>
       <div class="filter-row">
         <select id="filterType" onchange="filterCards()">
-          <option value="">種別: 全て</option>
+          <option value="">すべての種別</option>
           <option>ポケモン</option><option>グッズ</option>
           <option>サポート</option><option>スタジアム</option><option>エネルギー</option>
         </select>
         <select id="filterStage" onchange="filterCards()">
-          <option value="">段階: 全て</option>
+          <option value="">すべての進化</option>
           <option>たね</option><option>1進化</option><option>2進化</option>
         </select>
       </div>
@@ -500,10 +352,10 @@ header {
 <div class="page" id="tab-ace">
 <div class="container">
   <div class="panel">
-    <div class="panel-head">エースを選んで構築案を作る</div>
+    <div class="panel-head">エースから組む</div>
     <div class="panel-body">
       <div class="search-wrap">
-        <input class="search-input" type="search" id="aceSearch" placeholder="エースにするポケモンを検索..." oninput="renderAceCandidates()" autocomplete="off">
+        <input class="search-input" type="search" id="aceSearch" placeholder="エースにするポケモンを検索" oninput="renderAceCandidates()" autocomplete="off">
       </div>
       <div class="card-list" id="aceCandidates"></div>
     </div>
@@ -519,12 +371,12 @@ header {
     <div class="panel-body">
       <div class="deck-counter-bar">
         <span class="counter-num" id="deckCount">0</span>
-        <span class="counter-label">/ 60枚</span>
+        <span class="counter-label">/ 60 枚</span>
       </div>
       <div class="progress-wrap"><div class="progress-bar"><div class="progress-fill" id="deckBar" style="width:0%"></div></div></div>
-      <div class="deck-section"><div class="deck-sec-head">ポケモン <span id="cnt-pokemon">0</span></div><div id="list-pokemon"></div></div>
-      <div class="deck-section"><div class="deck-sec-head">トレーナーズ <span id="cnt-trainer">0</span></div><div id="list-trainer"></div></div>
-      <div class="deck-section"><div class="deck-sec-head">エネルギー <span id="cnt-energy">0</span></div><div id="list-energy"></div></div>
+      <div class="deck-section"><div class="deck-sec-head"><span>ポケモン</span><span id="cnt-pokemon">0</span></div><div id="list-pokemon"></div></div>
+      <div class="deck-section"><div class="deck-sec-head"><span>トレーナーズ</span><span id="cnt-trainer">0</span></div><div id="list-trainer"></div></div>
+      <div class="deck-section"><div class="deck-sec-head"><span>エネルギー</span><span id="cnt-energy">0</span></div><div id="list-energy"></div></div>
     </div>
   </div>
 </div>
@@ -532,33 +384,36 @@ header {
 
 <div class="page" id="tab-check">
 <div class="container">
-  <div class="panel"><div class="panel-head">バリデーション</div><div class="panel-body"><div class="valid-list" id="validList"></div></div></div>
-  <div class="panel"><div class="panel-head">デッキ統計</div><div class="panel-body"><div class="sec-title">カード種別</div><div class="stat-bars" id="statBars"></div></div></div>
+  <div class="panel"><div class="panel-head">デッキ判定</div><div class="panel-body"><div class="valid-list" id="validList"></div></div></div>
+  <div class="panel"><div class="panel-head">構成バランス</div><div class="panel-body"><div class="stat-bars" id="statBars"></div></div></div>
 </div>
 </div>
 
 <div class="page" id="tab-save">
 <div class="container">
   <div class="panel"><div class="panel-head">デッキを保存</div><div class="panel-body">
-    <div class="save-form"><input type="text" id="deckNameInput" placeholder="デッキ名を入力..."><button class="btn-save" onclick="saveDeck()">保存</button></div>
+    <div class="save-form"><input type="text" id="deckNameInput" placeholder="デッキ名"><button class="btn-save" onclick="saveDeck()">保存</button></div>
   </div></div>
-  <div class="panel"><div class="panel-head">保存済みデッキ</div><div class="panel-body"><div class="saved-list" id="savedList"></div></div></div>
-  <div class="panel"><div class="panel-head">エクスポート</div><div class="panel-body">
-    <div class="export-area"><textarea id="exportText" readonly></textarea><button class="btn-copy" onclick="copyExport()">📋 コピー</button></div>
+  <div class="panel"><div class="panel-head">保存したデッキ</div><div class="panel-body"><div class="saved-list" id="savedList"></div></div></div>
+  <div class="panel"><div class="panel-head">書き出し</div><div class="panel-body">
+    <div class="export-area"><textarea id="exportText" readonly></textarea><button class="btn-copy" onclick="copyExport()">コピー</button></div>
   </div></div>
 </div>
 </div>
 
 <nav class="bottom-nav">
-  <div class="nav-item active" data-tab="build" onclick="switchTab(this)"><span class="nav-icon">🔍</span><span class="nav-label">構築</span></div>
-  <div class="nav-item" data-tab="ace" onclick="switchTab(this)"><span class="nav-icon">⭐</span><span class="nav-label">エース</span></div>
-  <div class="nav-item" data-tab="deck" onclick="switchTab(this)"><span class="nav-icon">🃏</span><span class="nav-label">デッキ</span></div>
-  <div class="nav-item" data-tab="check" onclick="switchTab(this)"><span class="nav-icon">✅</span><span class="nav-label">チェック</span></div>
-  <div class="nav-item" data-tab="save" onclick="switchTab(this)"><span class="nav-icon">💾</span><span class="nav-label">保存</span></div>
+  <div class="nav-item active" data-tab="build" onclick="switchTab(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg><span class="nav-label">さがす</span></div>
+  <div class="nav-item" data-tab="ace" onclick="switchTab(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.5 5.5 6 .5-4.5 4 1.4 6L12 16l-5.4 3 1.4-6L3.5 9l6-.5z"/></svg><span class="nav-label">エース</span></div>
+  <div class="nav-item" data-tab="deck" onclick="switchTab(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="12" height="16" rx="2"/><path d="M8 7h4M8 11h4"/><path d="M18 7v12a2 2 0 0 1-2 2H8"/></svg><span class="nav-label">デッキ</span></div>
+  <div class="nav-item" data-tab="check" onclick="switchTab(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span class="nav-label">判定</span></div>
+  <div class="nav-item" data-tab="save" onclick="switchTab(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg><span class="nav-label">保存</span></div>
 </nav>
 
-<div class="toast" id="toast"></div>
+<div class="modal-backdrop" id="previewModal" onclick="if(event.target===this)closePreview()">
+  <div class="modal-card"></div>
+</div>
 
+<div class="toast" id="toast"></div>
 <script>
 // ===== エース構築ロジック（C版：進化ライン＋適正枚数）=====
 
@@ -700,13 +555,7 @@ let deck = {};
 
 // アイコン（タイプや種別から絵文字を割り当て）
 function iconFor(c) {
-  if (c.type === "エネルギー") return "⚡";
-  if (c.type === "サポート") return "🧑";
-  if (c.type === "グッズ") return "🎒";
-  if (c.type === "スタジアム") return "🏟️";
-  if (c.is_mega) return "🌟";
-  if (c.is_ex) return "✨";
-  return "🃏";
+  return "";
 }
 
 // ===== データ読み込み =====
@@ -775,7 +624,7 @@ function filterCards() {
     const row = document.createElement('div');
     row.className = 'card-row';
     row.innerHTML = `
-      <div class="card-thumb">${c.image ? `<img src="${c.image}" style="width:100%;height:100%;object-fit:cover;border-radius:4px" loading="lazy">` : c.icon}</div>
+      <div class="card-thumb" onclick="openPreview('${c.id}')">${c.image ? `<img src="${c.image}" style="width:100%;height:100%;object-fit:cover" loading="lazy">` : ''}</div>
       <div class="card-info">
         <div class="cn">${c.name}</div>
         <div class="cm">${c.type}${c.stage !== '-' ? ' · ' + c.stage : ''}${c.hp ? ' · HP' + c.hp : ''} ${ruleTag}</div>
@@ -834,7 +683,6 @@ function renderDeck() {
       const item = document.createElement('div');
       item.className = 'deck-item';
       item.innerHTML = `
-        <span class="di-icon">${c.icon}</span>
         <span class="di-name">${c.name}</span>
         <div class="di-ctrl">
           <button class="btn-sm" onclick="removeCard('${c.id}')">−</button>
@@ -873,7 +721,7 @@ function renderValidation() {
   results.forEach(r => {
     const div = document.createElement('div');
     div.className = 'valid-item ' + (r.warn ? 'warn' : r.ok ? 'ok' : 'ng');
-    div.innerHTML = `<span class="vi-icon">${r.warn ? '⚠️' : r.ok ? '✅' : '❌'}</span>
+    div.innerHTML = `<span class="vi-dot"></span>
       <div><div class="vi-label">${r.label}</div><div class="vi-detail">${r.detail}</div></div>`;
     el.appendChild(div);
   });
@@ -965,6 +813,29 @@ function copyExport() {
   showToast('コピーしました');
 }
 
+// ===== カードプレビュー =====
+function openPreview(id) {
+  const c = CARD_DB.find(x => x.id === id);
+  if (!c) return;
+  const inDeck = deck[c.id] || 0;
+  const max = c.basicEnergy ? 99 : 4;
+  const meta = [c.type, c.stage !== '-' ? c.stage : null, c.hp ? 'HP' + c.hp : null]
+    .filter(Boolean).join(' · ');
+  const m = document.getElementById('previewModal');
+  m.querySelector('.modal-card').innerHTML = `
+    ${c.image ? `<img src="${c.image}" alt="${c.name}">` : ''}
+    <div class="mc-name">${c.name}</div>
+    <div class="mc-meta">${meta}${inDeck ? ` · デッキに${inDeck}枚` : ''}</div>
+    <div class="modal-actions">
+      <button class="modal-close" onclick="closePreview()">閉じる</button>
+      <button class="modal-add" onclick="addCard('${c.id}');closePreview()" ${inDeck >= max ? 'disabled' : ''}>デッキに追加</button>
+    </div>`;
+  m.classList.add('show');
+}
+function closePreview() {
+  document.getElementById('previewModal').classList.remove('show');
+}
+
 // ===== トースト =====
 let toastTimer;
 function showToast(msg) {
@@ -994,11 +865,11 @@ function renderAceCandidates() {
     return;
   }
   list.forEach(c => {
-    const tag = c.is_mega ? '🌟メガex' : c.is_ex ? '✨ex' : '';
+    const tag = c.is_mega ? 'メガex' : c.is_ex ? 'ex' : '';
     const row = document.createElement('div');
     row.className = 'card-row';
     row.innerHTML = `
-      <div class="card-thumb">${c.image ? `<img src="${c.image}" style="width:100%;height:100%;object-fit:cover;border-radius:4px" loading="lazy">` : c.icon}</div>
+      <div class="card-thumb" onclick="openPreview('${c.id}')">${c.image ? `<img src="${c.image}" style="width:100%;height:100%;object-fit:cover" loading="lazy">` : ''}</div>
       <div class="card-info">
         <div class="cn">${c.name} ${tag ? `<span class="tag tag-ex" style="font-size:9px">${tag}</span>` : ''}</div>
         <div class="cm">${c.stage}${c.hp ? ' · HP' + c.hp : ''}</div>
