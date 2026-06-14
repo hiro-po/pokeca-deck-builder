@@ -4,11 +4,15 @@ from playwright.async_api import async_playwright
 START = "https://www.pokemon-card.com/card-search/index.php?se_ta=&keyword=&regulation_sidebar_form=XY&pg=&illust=&sm_and_keyword=true"
 
 async def extract(page):
+    try:
+        await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+        await asyncio.sleep(1)
+        await page.evaluate("window.scrollTo(0, 0)")
+        await asyncio.sleep(0.5)
+    except Exception:
+        pass
     got = []
-    for li in await page.query_selector_all("li"):
-        img = await li.query_selector("img[src*='card_images']")
-        if not img:
-            continue
+    for img in await page.query_selector_all("img[src*='card_images']"):
         src = await img.get_attribute("src")
         alt = await img.get_attribute("alt")
         if not src or not alt or not alt.strip():
@@ -105,19 +109,20 @@ async def main():
                     await page.wait_for_selector("img[src*='card_images']", timeout=15000)
                 except Exception:
                     pass
+            before = len(cards)
             for c in await extract(page):
                 if c["id"] not in cards:
                     cards[c["id"]] = c
-            if pno % 20 == 0:
-                print(f"list {pno}/{int(max_page)} total {len(cards)}")
+            if pno % 10 == 0 or pno <= 3:
+                print(f"page {pno}/{int(max_page)}: +{len(cards)-before} total {len(cards)}")
         print(f"list done {len(cards)}")
         pokes = [c for c in cards.values() if c["code"] == "P"]
         print(f"pokemon detail targets {len(pokes)}")
         for i, c in enumerate(pokes, 1):
             await fill_pokemon_detail(page, c)
-            if i % 25 == 0:
+            if i % 50 == 0:
                 print(f"  detail {i}/{len(pokes)}")
-            await asyncio.sleep(0.25)
+            await asyncio.sleep(0.2)
         await b.close()
     result = list(cards.values())
     with open("data/cards.json", "w", encoding="utf-8") as f:
