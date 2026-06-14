@@ -465,6 +465,7 @@ header {
 </head>
 <body>
 
+
 <header>
   <div class="logo">ポケカ<span>DB</span></div>
   <span class="reg-badge">HIJ スタンダード</span>
@@ -557,137 +558,133 @@ header {
 </nav>
 
 <div class="toast" id="toast"></div>
-<script>
-// ===== エース構築ロジック =====
 
-// 進化ラインを解決する（エースから進化元をたどる）
-// メガexの補完込み
+<script>
+// ===== エース構築ロジック（C版：進化ライン＋適正枚数）=====
+
 function resolveEvolutionLine(ace, db) {
-  const line = [ace];        // 末端（エース）から先頭（たね）へ
+  const line = [ace];
   let current = ace;
   const guard = new Set([ace.id]);
-
-  while (true) {
-    let prevName = current.evolvesFrom;
-
-    // メガex補完：evolvesFromがnullでもメガなら名前から進化元を推定
-    if (!prevName && current.is_mega) {
-      // 「メガカイリューex」→「カイリュー」を含む2進化候補、なければ近い名前
-      const base = current.name.replace(/^メガ/, "").replace(/ex$/i, "").trim();
-      // baseを含む名前で、stageが1つ下のものを探す
-      const wantStage = current.stage === "2進化" ? "1進化" : "たね";
-      const cand = db.find(c =>
-        c.type === "ポケモン" &&
-        c.stage === wantStage &&
-        c.name.includes(base) &&
-        c.name !== current.name
-      );
-      if (cand) prevName = cand.name;
-    }
-
-    if (!prevName) break;
-
-    // prevNameに一致するカードをDBから探す（同名複数あれば最初の1枚）
-    const prev = db.find(c => c.name === prevName && c.type === "ポケモン");
+  while (current && current.evolvesFrom) {
+    const prev = db.find(c => c.name === current.evolvesFrom && c.type === "ポケモン");
     if (!prev || guard.has(prev.id)) break;
     guard.add(prev.id);
-    line.unshift(prev);  // 先頭に追加（たね側）
+    line.unshift(prev);
     current = prev;
   }
-  return line;  // [たね, 1進化, 2進化(エース)] の順
+  return line;
 }
 
-// エースを中心に60枚デッキ案を作る
+function findByNames(db, names) {
+  for (const nm of names) {
+    const c = db.find(x => x.name === nm);
+    if (c) return c;
+  }
+  return null;
+}
+
+function findBasicEnergy(db) {
+  return db.find(c => c.type === "エネルギー" && c.name.includes("基本"))
+      || db.find(c => c.type === "エネルギー");
+}
+
 function buildDeckProposal(ace, db, style) {
-  const deck = {};  // id -> count
+  const deck = {};
   const line = resolveEvolutionLine(ace, db);
-
-  // スタイルごとのエース枚数設定
-  const aceCounts = {
-    speed:   { ace: 3, mid: 3, basic: 4 },  // 速攻：エース濃く
-    balance: { ace: 2, mid: 2, basic: 3 },  // バランス
-    control: { ace: 2, mid: 2, basic: 3 },  // コントロール
-  }[style];
-
-  // 進化ラインを枚数配分（進化元 ≧ 進化先 になるよう）
   const n = line.length;
-  line.forEach((card, idx) => {
-    // idx=0が一番下（たね）、末尾がエース
-    let cnt;
-    if (idx === n - 1) cnt = aceCounts.ace;        // エース
-    else if (idx === 0) cnt = aceCounts.basic;     // たね
-    else cnt = aceCounts.mid;                       // 中間
-    // 進化元 >= 進化先 を保証
-    deck[card.id] = cnt;
-  });
-  // たね>=中間>=エース になるよう調整
-  for (let i = n - 1; i > 0; i--) {
-    if ((deck[line[i-1].id] || 0) < (deck[line[i].id] || 0)) {
-      deck[line[i-1].id] = deck[line[i].id];
-    }
-  }
+  const topStage = ace.stage;
 
-  // 残り枚数を計算
-  let used = Object.values(deck).reduce((a, b) => a + b, 0);
-
-  // 定番トレーナーズを探して入れる（存在するものだけ）
-  const findCard = (names) => {
-    for (const nm of names) {
-      const c = db.find(x => x.name === nm);
-      if (c) return c;
-    }
-    return null;
-  };
-
-  // スタイル別のトレーナーズ構成
-  const trainerPlan = {
-    speed: [
-      { names: ["ネストボール"], count: 4 },
-      { names: ["ハイパーボール"], count: 4 },
-      { names: ["ボスの指令"], count: 3 },
-      { names: ["博士の研究", "ナンジャモ"], count: 4 },
-      { names: ["きずぐすり"], count: 2 },
-    ],
-    balance: [
-      { names: ["ネストボール"], count: 3 },
-      { names: ["ハイパーボール"], count: 3 },
-      { names: ["博士の研究", "ナンジャモ"], count: 4 },
-      { names: ["ボスの指令"], count: 2 },
-      { names: ["大きなおまもり"], count: 2 },
-      { names: ["ふしぎなアメ"], count: 3 },
-    ],
-    control: [
-      { names: ["ナンジャモ", "博士の研究"], count: 4 },
-      { names: ["ハイパーボール"], count: 3 },
-      { names: ["ボスの指令"], count: 3 },
-      { names: ["大きなおまもり"], count: 2 },
-      { names: ["崩れたスタジアム", "ポケモンリーグ本部"], count: 2 },
-      { names: ["カウンターキャッチャー"], count: 2 },
-    ],
+  const cfg = {
+    speed:   { ace: 3, energy: 9,  drawHeavy: false },
+    balance: { ace: 3, energy: 11, drawHeavy: false },
+    control: { ace: 2, energy: 12, drawHeavy: true  },
   }[style];
 
-  trainerPlan.forEach(({ names, count }) => {
-    const c = findCard(names);
-    if (c && used < 60) {
-      const add = Math.min(count, 60 - used);
-      deck[c.id] = (deck[c.id] || 0) + add;
-      used += add;
+  // --- 1) 進化ライン（進化元 >= 進化先）---
+  if (n === 1) {
+    deck[ace.id] = cfg.ace;
+  } else {
+    const counts = [];
+    counts[n - 1] = cfg.ace;
+    for (let i = n - 2; i >= 0; i--) {
+      counts[i] = Math.min(4, counts[i + 1] + 1);
     }
-  });
-
-  // 基本エネルギーで残りを埋める（エースの技に合うタイプを推定）
-  const basicEnergy = db.find(c =>
-    c.type === "エネルギー" && (c.name.includes("基本") || c.name.includes("エネルギー"))
-  );
-  if (basicEnergy && used < 60) {
-    deck[basicEnergy.id] = (deck[basicEnergy.id] || 0) + (60 - used);
-    used = 60;
+    line.forEach((c, i) => { deck[c.id] = counts[i]; });
   }
 
-  return { deck, line, used };
+  // --- 2) 2進化なら ふしぎなアメ ---
+  if (topStage === "2進化") {
+    const ame = findByNames(db, ["ふしぎなアメ"]);
+    if (ame) deck[ame.id] = 4;
+  }
+
+  // --- 3) トレーナーズ（HIJ対応。DBに実在するものだけ採用）---
+  // [カード, 標準枚数, 最大枚数, 最小枚数]
+  const trainerPlan = [
+    // サーチ（ボール系）
+    [findByNames(db, ["ネストボール"]), 3, 4, 1],
+    [findByNames(db, ["ハイパーボール"]), 3, 4, 1],
+    [findByNames(db, ["なかよしポフィン"]), 2, 4, 0],
+    [findByNames(db, ["モンスターボール"]), 2, 4, 0],
+    // ドロー（HIJ環境：リーリエの決心・ゼイユ・ムク）
+    [findByNames(db, ["リーリエの決心"]), cfg.drawHeavy ? 3 : 4, 4, 2],
+    [findByNames(db, ["ゼイユ"]), cfg.drawHeavy ? 3 : 2, 4, 1],
+    [findByNames(db, ["ムク"]), 2, 3, 0],
+    [findByNames(db, ["トレッキングシューズ"]), 2, 4, 0],
+    // 入れ替え
+    [findByNames(db, ["ポケモンいれかえ"]), 2, 3, 0],
+    // 詰め
+    [findByNames(db, ["ボスの指令"]), cfg.drawHeavy ? 3 : 2, 3, 1],
+    [findByNames(db, ["プライムキャッチャー"]), 1, 1, 0], // ACE SPEC（1枚制限）
+  ];
+  if (style === "control") {
+    trainerPlan.push([findByNames(db, ["大きなおまもり"]), 2, 3, 0]);
+    trainerPlan.push([findByNames(db, ["ロストスイーパー"]), 1, 2, 0]);
+  }
+  // 重複カード（同じカードが候補で複数回出た場合）を除外
+  const seen = new Set(Object.keys(deck));
+  const trainers = trainerPlan.filter(([c]) => c && !seen.has(c.id));
+  trainers.forEach(t => seen.add(t[0].id));
+
+  // 標準枚数で積む
+  trainers.forEach(([c, std]) => { deck[c.id] = (deck[c.id] || 0) + std; });
+
+  // --- 4) エネルギーを固定枠で積む ---
+  const energy = findBasicEnergy(db);
+  if (energy) deck[energy.id] = (deck[energy.id] || 0) + cfg.energy;
+
+  // --- 5) 60枚に調整（エネルギーは固定、トレーナーズで増減）---
+  let total = () => Object.values(deck).reduce((a, b) => a + b, 0);
+
+  // 超過 → トレーナーズを最小枚数まで削る（後ろの優先度低いものから）
+  let over = total() - 60;
+  if (over > 0) {
+    for (let i = trainers.length - 1; i >= 0 && over > 0; i--) {
+      const [c, std, mx, mn] = trainers[i];
+      const cur = deck[c.id] || 0;
+      const cut = Math.min(cur - mn, over);
+      if (cut > 0) { deck[c.id] = cur - cut; over -= cut; }
+      if (deck[c.id] <= 0) delete deck[c.id];
+    }
+  }
+
+  // 不足 → トレーナーズを最大枚数まで増やす（前の優先度高いものから）
+  let under = 60 - total();
+  if (under > 0) {
+    for (let i = 0; i < trainers.length && under > 0; i++) {
+      const [c, std, mx, mn] = trainers[i];
+      const cur = deck[c.id] || 0;
+      const add = Math.min(mx - cur, under);
+      if (add > 0) { deck[c.id] = cur + add; under -= add; }
+    }
+    // それでも余れば最後にエネルギーで埋める（保険）
+    if (under > 0 && energy) deck[energy.id] = (deck[energy.id] || 0) + under;
+  }
+
+  return { deck, line, used: total() };
 }
 
-// 3つの構築案を生成
 function generateProposals(ace, db) {
   return [
     { key: "speed",   label: "速攻型",       desc: "エースを早く立てて押し切る", ...buildDeckProposal(ace, db, "speed") },
